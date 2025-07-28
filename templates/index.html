@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Home | Articles Hub{% endblock %}
+{% block content %}
+  <section id="lista-posts">
+    <h2>Últimos Posts</h2>
+    <ul>
+      {% for post in posts %}
+        <li>
+          <a href="posts/{{ post.filename }}">{{ post.title }}</a>
+          <span class="data">— {{ post.date }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endblock %}

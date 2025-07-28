@@ -1,0 +1,12 @@
+body { font-family: Arial, sans-serif; margin:0; padding:0; }
+header { background:#333; color:#fff; padding:1rem; }
+header h1 { margin:0; display:inline; }
+nav { display:inline; margin-left:2rem; }
+nav a { color:#fff; margin-right:1rem; text-decoration:none; }
+main { padding:2rem; max-width:800px; margin:0 auto; }
+footer { background:#f1f1f1; text-align:center; padding:1rem; font-size:.9rem; }
+#lista-posts ul { list-style:none; padding:0; }
+#lista-posts li { margin-bottom:.5rem; }
+.data { color:#666; font-size:.9rem; margin-left:.5rem; }
+article h2 { margin-top:0; }
+.content p { line-height:1.6; margin-bottom:1rem; }
