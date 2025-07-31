@@ -1,116 +1,69 @@
-import os, time, random, requests
-from datetime import datetime, timedelta
-from jinja2 import Environment, FileSystemLoader
+import os
+import time
 from dotenv import load_dotenv
+from openai import OpenAI
+from datetime import datetime, timedelta
+import random
 
-# → Carrega variáveis de ambiente
+# Carrega a chave da OpenRouter
 load_dotenv()
-OPENAI_KEY   = os.getenv("OPENROUTER_API_KEY")
-NEWS_KEY     = os.getenv("NEWS_API_KEY")
-AFILIADO     = os.getenv("AFILIADO")
-NUM_NOTICIAS = int(os.getenv("NUM_NOTICIAS", 1))
-NUM_PROD     = int(os.getenv("NUM_PROD", 1))
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+)
 
-# → Paths
-TEMPLATE_DIR = "templates"
-OUTPUT_DIR   = "site"
-POSTS_DIR    = os.path.join(OUTPUT_DIR, "posts")
-env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+def gerar_tema():
+    print("Gerando tema...")
+    ontem = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
+    hoje = datetime.utcnow().strftime("%Y-%m-%d")
 
-# — Busca títulos de notícias de hoje e ontem
-def obter_temas_noticia(qtd=1):
-    ontem = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
-    hoje = datetime.now().strftime('%Y-%m-%d')
-    url = (
-        f"https://newsapi.org/v2/everything?"
-        f"from={ontem}&to={hoje}&sortBy=publishedAt&language=pt&"
-        f"pageSize={qtd}&apiKey={NEWS_KEY}"
+    prompt = f"""
+Crie um título criativo e direto para um post de afiliados. Use algum tema relevante baseado em alguma novidade que surgiu nos dias {ontem} ou {hoje}, dentro das áreas de tecnologia, casa, moda ou esportes.
+Responda apenas com o título, nada mais.
+"""
+    resposta = client.chat.completions.create(
+        model="openchat/openchat-7b",
+        messages=[{"role": "user", "content": prompt}]
     )
-    resp = requests.get(url).json()
-    if resp.get("status") != "ok":
-        return []
-    return [a["title"] for a in resp["articles"] if a.get("title")]
+    return resposta.choices[0].message.content.strip().replace('"', "")
 
-# — Gera post via OpenRouter (GPT-3.5-turbo)
-def gerar_artigo(titulo):
-    prompt = (
-        f"Crie um artigo informativo e formal sobre: '{titulo}'. "
-        "Use subtítulos (<h3>), listas (<ul><li>), e finalize com um link de afiliado: "
-        f"{AFILIADO}"
+def gerar_conteudo(titulo):
+    print("Gerando conteúdo...")
+    prompt = f"""
+Crie um post de blog detalhado e envolvente com base neste título: "{titulo}". Escreva um artigo com pelo menos 4 parágrafos, explique bem o tema, com linguagem simples e natural. No final, recomende algum produto relacionado e inclua este link de afiliado:
+https://www.amazon.com.br/?tag=autogadgetbr-20
+"""
+    resposta = client.chat.completions.create(
+        model="openchat/openchat-7b",
+        messages=[{"role": "user", "content": prompt}]
     )
-    headers = {"Authorization": f"Bearer {OPENAI_KEY}"}
-    body = {"model":"gpt-3.5-turbo","messages":[{"role":"user","content":prompt}]}
-    resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=body)
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"]
+    return resposta.choices[0].message.content.strip()
 
-# — Salva um post HTML via template
-def salvar_post(title, content):
-    date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-    slug = "".join(c for c in title if c.isalnum() or c in "-_ ").strip().replace(" ", "-")[:50]
-    filename = f"{date_str.replace(':','-')}_{slug}.html"
-    tmpl = env.get_template("post.html")
-    html  = tmpl.render(title=title, date=date_str, content=content)
-    os.makedirs(POSTS_DIR, exist_ok=True)
-    path = os.path.join(POSTS_DIR, filename)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(html)
-    return {"title": title, "date": date_str, "filename": filename}
+def salvar_post(titulo, conteudo):
+    print("Salvando post...")
+    data = datetime.now().strftime("%Y-%m-%d")
+    nome_arquivo = f"{data}-{random.randint(1000,9999)}.html"
+    caminho_post = os.path.join("site", "posts", nome_arquivo)
 
-# — Atualiza index.html com lista de posts
-def atualizar_index():
-    posts = sorted(
-        [f for f in os.listdir(POSTS_DIR) if f.endswith(".html")],
-        reverse=True
-    )
-    data = []
-    for fn in posts:
-        # obtem title e date do filename
-        parts = fn.split("_",1)
-        date = parts[0].replace("-",":",1)
-        title = fn.split("_",1)[1].rsplit(".",1)[0].replace("-", " ")
-        data.append({"title": title, "date": date, "filename": fn})
-    tmpl = env.get_template("index.html")
-    html = tmpl.render(posts=data)
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    with open(os.path.join(OUTPUT_DIR,"index.html"),"w",encoding="utf-8") as f:
-        f.write(html)
+    # Garante que o diretório "posts" existe
+    os.makedirs(os.path.join("site", "posts"), exist_ok=True)
 
-# — Fluxo 5-2-3-1
-def ciclo():
-    # 1 notícia atual
-    titulos = obter_temas_noticia(NUM_NOTICIAS)
-    for t in titulos:
-        content = gerar_artigo(t)
-        salvar_post(t, content)
-    time.sleep(5*60)
+    with open("site/templates/post.html", "r", encoding="utf-8") as modelo:
+        html_base = modelo.read()
+        html_pronto = html_base.replace("{{ titulo }}", titulo).replace("{{ conteudo }}", conteudo)
 
-    # 1 produto famoso (fallback de lista)
-    produtos = ["Top 10 celulares 2025","Melhores fones wireless","Relógios smartwatch"]
-    t = random.choice(produtos)
-    c = gerar_artigo(t)
-    salvar_post(t, c)
-    time.sleep(5*60)
+    with open(caminho_post, "w", encoding="utf-8") as arquivo:
+        arquivo.write(html_pronto)
 
-    # 2 posts diversos (qualquer tema)
-    gerais = ["Guerras recentes no mundo", "Novas regras do futebol", "Tendências da moda 2025"]
-    for t in random.sample(gerais,2):
-        c = gerar_artigo(t)
-        salvar_post(t, c)
-    time.sleep(5*60)
+    print(f"Post salvo em: site/posts/{nome_arquivo}")
 
-    # 1 produto de novo
-    t = random.choice(produtos)
-    c = gerar_artigo(t)
-    salvar_post(t, c)
-    time.sleep(5*60)
+def main():
+    titulo = gerar_tema()
+    conteudo = gerar_conteudo(titulo)
+    salvar_post(titulo, conteudo)
 
-if __name__=="__main__":
+if __name__ == "__main__":
     while True:
-        try:
-            ciclo()
-            atualizar_index()
-            print("✅ Ciclo completo. Próximo em 5 minutos.")
-        except Exception as e:
-            print("❌ Erro:", e)
-            time.sleep(5*60)
+        main()
+        print("Aguardando 2 minutos...\n")
+        time.sleep(120)

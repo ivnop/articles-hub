@@ -1,16 +1,37 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-  <meta charset="UTF-8">
-  <title>{{ title }}</title>
-  <link rel="stylesheet" href="../assets/estilo.css">
+    <meta charset="UTF-8">
+    <title>{{ titulo }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            margin: 40px;
+            padding: 20px;
+            background-color: #f4f4f4;
+            color: #222;
+        }
+        h1 {
+            color: #0077cc;
+        }
+        a {
+            color: #0077cc;
+        }
+        .container {
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.05);
+            max-width: 800px;
+            margin: auto;
+        }
+    </style>
 </head>
 <body>
-  <article>
-    <h1>{{ title }}</h1>
-    <p><em>{{ date }}</em></p>
-    {{ content | safe }}
-  </article>
-  <p><a href="../index.html">← Voltar</a></p>
+    <div class="container">
+        <h1>{{ titulo }}</h1>
+        <div>{{ conteudo|safe }}</div>
+    </div>
 </body>
 </html>
